@@ -1,0 +1,49 @@
+"""Consulta direta ou interpolação linear dentro da faixa fornecida.
+
+Não realiza extrapolação nem deduz características hidrostáticas apenas de L, B e D.
+"""
+import numpy as np
+from .validacao import verificar_hidro, numero
+
+FIELDS = ("calado_m", "km_m", "kb_m", "lcb_m", "lcf_m", "mtc_kgm_por_m")
+
+
+def consultar(barco, deslocamento_kg):
+    numero(deslocamento_kg, "deslocamento", positivo=True)
+    tabela = sorted(barco.get("hidro_tabela", []), key=lambda r: r["deslocamento_kg"])
+    verificar_hidro(tabela)
+    if tabela:
+        d = [r["deslocamento_kg"] for r in tabela]
+        if deslocamento_kg < d[0] or deslocamento_kg > d[-1]:
+            raise ValueError(f"Deslocamento {deslocamento_kg:g} kg fora da faixa hidrostática [{d[0]:g}, {d[-1]:g}] kg; extrapolação proibida")
+        result = {"deslocamento_kg":deslocamento_kg, "metodo":"Interpolação linear interna na tabela AP1/hidrostática"}
+        for k in FIELDS:
+            if all(r.get(k) is not None for r in tabela):
+                result[k] = float(np.interp(deslocamento_kg, d, [r[k] for r in tabela]))
+            else:
+                # Para ponto exatamente tabulado, o valor desse ponto pode ser usado.
+                matches = [r for r in tabela if abs(r["deslocamento_kg"]-deslocamento_kg)<1e-10*max(1,deslocamento_kg)]
+                result[k] = matches[0].get(k) if matches else None
+        return result
+    ref = barco.get("deslocamento_referencia_kg")
+    if ref is None or not np.isclose(ref, deslocamento_kg, rtol=1e-10, atol=1e-9):
+        raise ValueError("Sem tabela hidrostática correspondente a este deslocamento. Importe a curva ou informe o estado exato")
+    return {"deslocamento_kg":deslocamento_kg, "metodo":"Dados hidrostáticos de uma condição única fornecida", **{k:barco.get(k) for k in FIELDS}}
+
+
+def superficie_livre(barco, deslocamento_kg):
+    """FSC (m)=FSM (kg·m)/Δ (kg), se FSM efetivo foi fornecido."""
+    fsm = barco.get("fsm_kgm")
+    if fsm is None:
+        return None
+    return numero(fsm, "Momento de superfície livre", nao_negativo=True)/numero(deslocamento_kg, "Deslocamento", positivo=True)
+
+
+def trim_estatico(carregamento, hidro):
+    """Momento longitudinal Δ(LCG-LCB), kg·m; trim por MCT só quando fornecido."""
+    lcg, lcb = carregamento.get("lcg_m"), hidro.get("lcb_m")
+    if lcg is None or lcb is None:
+        return {"momento_trim_kgm":None, "variacao_trim_m":None}
+    momento = carregamento["deslocamento_kg"] * (lcg-lcb)
+    mtc = hidro.get("mtc_kgm_por_m")
+    return {"momento_trim_kgm":momento,"variacao_trim_m":momento/mtc if mtc is not None and mtc > 0 else None}

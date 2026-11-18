@@ -1,0 +1,21 @@
+{
+  "nome": "INSERIR IDENTIFICACAO",
+  "massa_base_kg": null,
+  "base_x_m": null,
+  "base_y_m": null,
+  "base_z_m": null,
+  "L_m": null,
+  "B_m": null,
+  "D_m": null,
+  "z_min_m": null,
+  "z_max_m": null,
+  "deslocamento_referencia_kg": null,
+  "calado_m": null,
+  "km_m": null,
+  "fsm_kgm": null,
+  "gz_deslocamento_kg": null,
+  "gz_kg_referencia_m": null,
+  "hidro_tabela": [],
+  "gz_curva": [],
+  "casco_contorno": []
+}

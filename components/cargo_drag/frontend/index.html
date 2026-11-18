@@ -1,0 +1,17 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><style>
+body{margin:0;padding:10px;font-family:Arial,sans-serif;color:#334155}svg{width:100%;height:290px;touch-action:none;border:1px solid #d4dbe5;border-radius:9px;background:#f8fafc}circle.load{cursor:grab}circle.load:active{cursor:grabbing}#hint{font-size:12px;margin:8px 0}
+</style></head><body><div id="hint">Arraste os círculos (X/Y). O contorno é nominal, não uma geometria de carena.</div><svg id="s" viewBox="0 0 900 290"></svg>
+<script>
+let args={cargas:[],comprimento:1,boca:1};let active=null;const s=document.getElementById('s');
+function send(type,data){window.parent.postMessage({isStreamlitMessage:true,type,...data},'*')}
+function node(n,attr={},txt){let e=document.createElementNS('http://www.w3.org/2000/svg',n);Object.entries(attr).forEach(([k,v])=>e.setAttribute(k,v));if(txt)e.textContent=txt;return e}
+function coord(x,y){return [40+820*x/args.comprimento,145-215*y/args.boca]}
+function uncoord(px,py){return [Math.max(0,Math.min(args.comprimento,(px-40)*args.comprimento/820)),Math.max(-args.boca/2,Math.min(args.boca/2,(145-py)*args.boca/215))]}
+function draw(){s.replaceChildren();let b=args.boca,L=args.comprimento;if(!(b>0&&L>0))return;let rect=node('rect',{x:40,y:37.5,width:820,height:215,fill:'#dbeafe',stroke:'#0284c7','stroke-width':2,rx:8});s.append(rect);s.append(node('line',{x1:40,y1:145,x2:860,y2:145,stroke:'#94a3b8','stroke-dasharray':'5,5'}));s.append(node('text',{x:45,y:30,'font-size':12},'Boreste (Y+)' ));s.append(node('text',{x:45,y:275,'font-size':12},'Bombordo (Y−)'));for (let c of args.cargas){const [x,y]=coord(c.x_m,c.y_m);let circle=node('circle',{cx:x,cy:y,r:11,fill:'#f59e0b',stroke:'#92400e','stroke-width':1.5,class:'load','data-id':c.id});let label=node('text',{x:x+13,y:y-10,'font-size':12},c.nome);s.append(circle,label)}}
+function getSvgPoint(ev){let p=s.createSVGPoint();p.x=ev.clientX;p.y=ev.clientY;return p.matrixTransform(s.getScreenCTM().inverse())}
+s.addEventListener('pointerdown',ev=>{const id=ev.target.getAttribute('data-id');if(!id)return;active=id;s.setPointerCapture(ev.pointerId)});
+s.addEventListener('pointermove',ev=>{if(active===null)return;let p=getSvgPoint(ev),[x,y]=uncoord(p.x,p.y);let c=args.cargas.find(c=>c.id===active);if(c){c.x_m=x;c.y_m=y;draw()}});
+s.addEventListener('pointerup',()=>{if(active!==null){const c=args.cargas.find(c=>c.id===active);if(c)send('streamlit:setComponentValue',{value:{id:c.id,x_m:c.x_m,y_m:c.y_m,nonce:Date.now()}});active=null}});
+window.addEventListener('message',ev=>{if(ev.data.type==='streamlit:render'){args=ev.data.args||args;draw();send('streamlit:setFrameHeight',{height:330})}});
+send('streamlit:componentReady',{apiVersion:1});send('streamlit:setFrameHeight',{height:330});
+</script></body></html>
